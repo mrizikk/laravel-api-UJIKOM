@@ -294,7 +294,7 @@ class AdminController extends Controller
         $kategori = Kategori::findOrFail($id);
 
         // Opsional: Cek apakah kategori masih dipakai oleh alat
-        if ($kategori->alats()->count() > 0) {
+        if ($kategori->alat()->count() > 0) {
             return redirect()->route('admin.kategori.index')
                              ->with('error', 'Kategori tidak dapat dihapus karena masih digunakan oleh data alat.');
         }
@@ -305,36 +305,40 @@ class AdminController extends Controller
                          ->with('success', 'Kategori berhasil dihapus.');
     }
     // 1. Menampilkan daftar peminjaman
-public function indexPengembalian()
+public function indexPengembalian(Request $request)
 {
-    // Data yang sudah dikembalikan
-    $pengembalians = Pengembalian::with([
-        'peminjaman.user'
-    ])
-    ->latest()
-    ->paginate(10);
+    $search = $request->input('search');
 
-    // Peminjaman yang masih belum dikembalikan
-    $sedangDipinjam = Peminjaman::with([
-        'user'
-    ])
-    ->whereDoesntHave('pengembalian')
-    ->latest()
-    ->get();
+    // Menunggu pengembalian
+    $sedangDipinjam = Peminjaman::with('user')
+        ->whereIn('status', ['dipinjam', 'telat'])
+        ->whereDoesntHave('pengembalian')
+        ->when($search, function ($query, $search) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($u) use ($search) {
+                    $u->where('name', 'like', "%{$search}%");
+                })->orWhere('id', 'like', "%{$search}%");
+            });
+        })
+        ->latest()
+        ->get();
 
     // Riwayat pengembalian
-    $riwayat = Pengembalian::with([
-    'peminjaman.user'
-    ])
-    ->latest()
-    ->paginate(10)
-    ->withQueryString();
+    $riwayat = Pengembalian::with('peminjaman.user', 'petugas')
+        ->when($search, function ($query, $search) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('peminjaman.user', function ($u) use ($search) {
+                    $u->where('name', 'like', "%{$search}%");
+                })
+                ->orWhere('kondisi_kembali', 'like', "%{$search}%")
+                ->orWhere('peminjaman_id', 'like', "%{$search}%");
+            });
+        })
+        ->latest()
+        ->paginate(10)
+        ->withQueryString();
 
-    return view('admin.pengembalian.index', compact(
-        'pengembalians',
-        'sedangDipinjam',
-        'riwayat'
-    ));
+    return view('admin.pengembalian.index', compact('sedangDipinjam', 'riwayat', 'search'));
 }
 // 1. Menampilkan daftar peminjaman
 public function indexPeminjaman(Request $request)
@@ -379,7 +383,7 @@ public function storePeminjaman(Request $request)
         'tgl_pinjam' => 'required|date',
         'tgl_kembali_plan' => 'required|date|after_or_equal:tgl_pinjam',
         'alat_id' => 'required|array',
-        'alat_id.*' => 'exists:alats,id',
+        'alat_id.*' => 'exists:alat,id',
         'jumlah' => 'required|array',
         'jumlah.*' => 'integer|min:1',
     ]);
@@ -478,5 +482,106 @@ public function destroyPeminjaman($id)
     $peminjaman->delete();
 
     return redirect()->route('admin.peminjaman.index')->with('success', 'Data peminjaman berhasil dihapus.');
+}
+// Menyimpan data pengembalian
+public function storePengembalian(Request $request)
+{
+    $request->validate([
+        'peminjaman_id'   => 'required|exists:peminjaman,id',
+        'tgl_kembali'     => 'required|date|before_or_equal:today',
+        'kondisi_kembali' => 'required|string|max:255',
+        'denda'           => 'nullable|integer|min:0',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $peminjaman = Peminjaman::with('detailPinjams.alat')->findOrFail($request->peminjaman_id);
+
+        if (Pengembalian::where('peminjaman_id', $peminjaman->id)->exists()) {
+            throw new \Exception('Peminjaman ini sudah pernah dikembalikan.');
+        }
+
+        // Denda Rp5.000 per hari keterlambatan
+        $tglKembali = \Carbon\Carbon::parse($request->tgl_kembali)->startOfDay();
+        $rencana    = \Carbon\Carbon::parse($peminjaman->tgl_kembali_plan)->startOfDay();
+        $hariTelat  = max(0, (int) $rencana->diffInDays($tglKembali, false));
+        $denda      = $hariTelat * 5000;
+
+        Pengembalian::create([
+            'peminjaman_id'   => $peminjaman->id,
+            'tgl_kembali'     => $request->tgl_kembali,
+            'kondisi_kembali' => $request->kondisi_kembali,
+            'denda'           => (int) ($request->denda ?? 0),
+            'petugas_id'      => auth()->id(),
+        ]);
+
+        // Stok kembali hanya jika sebelumnya sudah dikurangi (dipinjam/telat)
+        if (in_array(strtolower($peminjaman->status), ['dipinjam', 'telat'])) {
+            foreach ($peminjaman->detailPinjams as $detail) {
+                $detail->alat->increment('stok', $detail->jumlah);
+            }
+        }
+
+        $peminjaman->update(['status' => 'selesai']);
+
+        DB::commit();
+        return redirect()->route('admin.pengembalian.index')
+            ->with('success', 'Pengembalian berhasil dicatat.' . ($denda > 0 ? ' Denda: Rp' . number_format($denda, 0, ',', '.') : ''));
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->with('error', $e->getMessage());
+    }
+}
+// Menghapus data pengembalian
+public function destroyPengembalian($id)
+{
+    DB::beginTransaction();
+    try {
+        $pengembalian = Pengembalian::with('peminjaman.detailPinjams.alat')->findOrFail($id);
+        $peminjaman   = $pengembalian->peminjaman;
+
+        if ($peminjaman) {
+            foreach ($peminjaman->detailPinjams as $detail) {
+                $detail->alat->decrement('stok', $detail->jumlah);
+            }
+            $peminjaman->update(['status' => 'dipinjam']);
+        }
+
+        $pengembalian->delete();
+
+        DB::commit();
+        return redirect()->route('admin.pengembalian.index')
+            ->with('success', 'Pengembalian dibatalkan, peminjaman kembali berstatus dipinjam.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', $e->getMessage());
+    }
+}
+// Menampilkan form edit pengembalian
+public function editPengembalian($id)
+{
+    $pengembalian = Pengembalian::with('peminjaman.user', 'peminjaman.detailPinjams.alat')
+        ->findOrFail($id);
+
+    return view('admin.pengembalian.edit', compact('pengembalian'));
+}
+
+// Menyimpan koreksi data pengembalian
+public function updatePengembalian(Request $request, $id)
+{
+    $pengembalian = Pengembalian::findOrFail($id);
+
+    $request->validate([
+        'kondisi_kembali' => 'required|string|max:255',
+        'denda'           => 'nullable|integer|min:0',
+    ]);
+
+    $pengembalian->update([
+        'kondisi_kembali' => $request->kondisi_kembali,
+        'denda'           => (int) ($request->denda ?? 0),
+    ]);
+
+    return redirect()->route('admin.pengembalian.index')
+        ->with('success', 'Data pengembalian berhasil dikoreksi.');
 }
 }

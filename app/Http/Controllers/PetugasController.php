@@ -89,34 +89,39 @@ class PetugasController extends Controller
     public function prosesPengembalian(Request $request, $id)
     {
         $request->validate([
-            'kondisi_kembali' => 'required|string|max:255',
-            'denda' => 'nullable|numeric|min:0',
+        'kondisi_kembali' => 'required|string|max:255',
+        'denda'           => 'nullable|numeric|min:0',
         ]);
 
         DB::beginTransaction();
         try {
-            $peminjaman = Peminjaman::with('detailPinjams')->findOrFail($id);
+        $peminjaman = Peminjaman::with('detailPinjams')->findOrFail($id);
 
-            // Catat data pengembalian
-            Pengembalian::create([
-                'peminjaman_id'      => $peminjaman->id,
-                'kondisi_alat'       => $request->kondisi_kembali,
-                'denda'              => $request->denda ?? 0,
-                'tgl_kembali_aktual' => now(),
-            ]);
+        if (Pengembalian::where('peminjaman_id', $peminjaman->id)->exists()) {
+            throw new \Exception('Peminjaman ini sudah pernah dikembalikan.');
+        }
 
-            // Update status peminjaman jadi selesai
-            $peminjaman->update(['status' => 'selesai']);
+        // Catat data pengembalian
+        Pengembalian::create([
+            'peminjaman_id'   => $peminjaman->id,
+            'tgl_kembali'     => now()->toDateString(),
+            'kondisi_kembali' => $request->kondisi_kembali,
+            'denda'           => (int) ($request->denda ?? 0),
+            'petugas_id'      => auth()->id(),
+        ]);
 
-            // Kembalikan stok alat
+        // Update status peminjaman
+        $peminjaman->update(['status' => 'dikembalikan']);
+
+        // Kembalikan stok alat
             foreach ($peminjaman->detailPinjams as $detail) {
-                $alat = Alat::findOrFail($detail->alat_id);
-                $alat->stok += $detail->jumlah;
-                $alat->save();
+            $alat = Alat::findOrFail($detail->alat_id);
+            $alat->stok += $detail->jumlah;
+            $alat->save();
             }
 
-            DB::commit();
-            return redirect()->back()->with('success', 'Pengembalian berhasil diproses.');
+        DB::commit();
+        return redirect()->back()->with('success', 'Pengembalian berhasil diproses.');
         } catch (\Exception $e) {
             DB::rollback();
             return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());

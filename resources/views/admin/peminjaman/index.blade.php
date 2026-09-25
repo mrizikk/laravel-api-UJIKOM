@@ -45,7 +45,8 @@
             </thead>
             <tbody class="divide-y divide-gray-100 text-sm">
                 @forelse($peminjamans as $peminjaman)
-                <tr class="hover:bg-gray-50">
+                @php $status = strtolower($peminjaman->status ?? ''); @endphp
+                    <tr class="hover:bg-gray-50">
                     <!-- Peminjam -->
                     <td class="py-4 px-4 font-medium text-gray-800">
                         {{ $peminjaman->user->name ?? 'N/A' }}
@@ -65,19 +66,24 @@
 
                     <!-- Tanggal -->
                     <td class="py-4 px-4 text-gray-600">
-                        <div><span class="text-xs text-gray-400">Pinjam:</span> {{ \Carbon\Carbon::parse($peminjaman->tanggal_pinjam)->format('Y-m-d') }}</div>
-                        <div><span class="text-xs text-gray-400">Rencana:</span> {{ \Carbon\Carbon::parse($peminjaman->tanggal_kembali_rencana)->format('Y-m-d') }}</div>
+                        <div>
+                            <span class="text-xs text-gray-400">Pinjam:</span>
+                                {{ $peminjaman->tgl_pinjam ? \Carbon\Carbon::parse($peminjaman->tgl_pinjam)->format('Y-m-d') : '-' }}
+                        </div>
+                            <div>
+                                <span class="text-xs text-gray-400">Rencana:</span>
+                                    {{ $peminjaman->tgl_kembali_plan ? \Carbon\Carbon::parse($peminjaman->tgl_kembali_plan)->format('Y-m-d') : '-' }}
+                            </div>
                     </td>
-
-                    <!-- Status Badge -->
+                                        <!-- Status Badge -->
                     <td class="py-4 px-4">
-                        @if($peminjaman->status == 'Diajukan')
+                        @if($status == 'diajukan')
                             <span class="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-medium">Diajukan</span>
-                        @elseif($peminjaman->status == 'Dipinjam')
+                        @elseif($status == 'dipinjam')
                             <span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full font-medium">Dipinjam</span>
-                        @elseif($peminjaman->status == 'Selesai' || $peminjaman->status == 'Dikembalikan')
+                        @elseif($status == 'selesai' || $status == 'dikembalikan')
                             <span class="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-medium">Selesai</span>
-                        @elseif($peminjaman->status == 'Telat')
+                        @elseif($status == 'telat')
                             <span class="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-medium">Telat</span>
                         @endif
                     </td>
@@ -88,12 +94,12 @@
                             <!-- Dropdown Ubah Status -->
                             <form action="{{ route('admin.peminjaman.updateStatus', $peminjaman->id) }}" method="POST">
                                 @csrf
-                                @method('PATCH')
+                                @method('PUT')
                                 <select name="status" onchange="this.form.submit()" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
-                                    <option value="Diajukan" {{ $peminjaman->status == 'Diajukan' ? 'selected' : '' }}>Diajukan</option>
-                                    <option value="Dipinjam" {{ $peminjaman->status == 'Dipinjam' ? 'selected' : '' }}>Dipinjam</option>
-                                    <option value="Selesai" {{ $peminjaman->status == 'Selesai' || $peminjaman->status == 'Dikembalikan' ? 'selected' : '' }}>Selesai</option>
-                                    <option value="Telat" {{ $peminjaman->status == 'Telat' ? 'selected' : '' }}>Telat</option>
+                                    <option value="diajukan" {{ $status == 'diajukan' ? 'selected' : '' }}>Diajukan</option>
+                                    <option value="dipinjam" {{ $status == 'dipinjam' ? 'selected' : '' }}>Dipinjam</option>
+                                    <option value="selesai" {{ in_array($status, ['selesai','dikembalikan']) ? 'selected' : '' }}>Selesai</option>
+                                    <option value="telat" {{ $status == 'telat' ? 'selected' : '' }}>Telat</option>
                                 </select>
                             </form>
 

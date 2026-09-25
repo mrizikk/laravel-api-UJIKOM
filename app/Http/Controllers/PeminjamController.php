@@ -19,7 +19,8 @@ class PeminjamController extends Controller
     public function ajukanPeminjaman(Request $request)
     {
         $request->validate([
-            'tgl_kembali_plan' => 'required|date|after:today',
+            'tgl_pinjam' => 'required|date|after_or_equal:today',
+            'tgl_kembali_plan' => 'required|date|after:tgl_pinjam',
             'alat_id' => 'required|array',
             'jumlah' => 'required|array',
         ]);
@@ -28,7 +29,7 @@ class PeminjamController extends Controller
         try {
             $peminjaman = Peminjaman::create([
                 'user_id' => auth()->id(),
-                'tgl_pinjam' => now(),
+                'tgl_pinjam' => $request->tgl_pinjam,
                 'tgl_kembali_plan' => $request->tgl_kembali_plan,
                 'status' => 'diajukan',
             ]);
@@ -51,11 +52,26 @@ class PeminjamController extends Controller
 
     public function riwayatPeminjaman()
     {
-        $peminjamans = Peminjaman::with('detailPinjams.alat')
+        $peminjamans = Peminjaman::with(['detailPinjams.alat', 'pengembalian'])
             ->where('user_id', auth()->id())
             ->latest()
             ->get();
 
-        return view('peminjam.riwayat', compact('peminjamans'));
+        $alats = Alat::with('kategori')->where('stok', '>', 0)->get();
+
+        return view('peminjam.riwayat', compact('peminjamans', 'alats'));
+    }
+
+    public function ajukanPengembalian($id)
+    {
+        $peminjaman = Peminjaman::where('user_id', auth()->id())->findOrFail($id);
+
+        if (!in_array($peminjaman->status, ['dipinjam', 'terlambat'])) {
+            return redirect()->back()->with('error', 'Peminjaman ini tidak dapat diajukan pengembaliannya.');
+        }
+
+        $peminjaman->update(['status' => 'menunggu_konfirmasi']);
+
+        return redirect()->route('peminjam.riwayat')->with('success', 'Pengajuan pengembalian berhasil dikirim, menunggu konfirmasi petugas.');
     }
 }

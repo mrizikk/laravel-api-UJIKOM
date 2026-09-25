@@ -17,6 +17,30 @@
     </div>
 @endif
 
+@if ($errors->any())
+    <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">{{ $errors->first() }}</div>
+@endif
+
+<div class="flex flex-col md:flex-row md:items-center md:justify-end gap-2 mb-4">
+    <form action="{{ route('admin.pengembalian.index') }}" method="GET" class="flex gap-2">
+        <input type="text" name="search" value="{{ $search ?? '' }}"
+               placeholder="Cari nama peminjam / kondisi / ID..."
+               class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-72">
+        <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Cari
+        </button>
+        @if (!empty($search))
+            <a href="{{ route('admin.pengembalian.index') }}"
+               class="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Reset</a>
+        @endif
+    </form>
+
+    <button type="button" onclick="bukaModal('')"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+        + Tambah Pengembalian
+    </button>
+</div>
+
 {{-- ================= MENUNGGU PENGEMBALIAN ================= --}}
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
     <div class="px-5 py-4 border-b border-gray-100 font-semibold text-gray-800">
@@ -53,62 +77,13 @@
                         </td>
                         <td class="px-5 py-3 text-right">
                             <button type="button"
-                                    onclick="document.getElementById('modalProses{{ $p->id }}').classList.remove('hidden')"
+                                    onclick="bukaModal('{{ $p->id }}')"
                                     class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
                                 Proses Pengembalian
                             </button>
                         </td>
                     </tr>
 
-                    {{-- Modal Proses Pengembalian --}}
-                    <div id="modalProses{{ $p->id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-                            <form action="{{ route('admin.pengembalian.store', $p->id) }}" method="POST">
-                                @csrf
-                                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                                    <h5 class="font-semibold text-gray-800">Proses Pengembalian #{{ $p->id }}</h5>
-                                    <button type="button"
-                                            onclick="document.getElementById('modalProses{{ $p->id }}').classList.add('hidden')"
-                                            class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-                                </div>
-                                <div class="px-5 py-4 space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-600 mb-1">Tanggal Kembali</label>
-                                        <input type="date" name="tgl_kembali"
-                                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                               value="{{ now()->format('Y-m-d') }}"
-                                               max="{{ now()->format('Y-m-d') }}" required>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-600 mb-1">Kondisi Alat</label>
-                                        <select name="kondisi_kembali" required
-                                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                            <option value="">-- Pilih Kondisi --</option>
-                                            <option value="Baik">Baik</option>
-                                            <option value="Rusak Ringan">Rusak Ringan</option>
-                                            <option value="Rusak Berat">Rusak Berat</option>
-                                            <option value="Hilang">Hilang</option>
-                                        </select>
-                                    </div>
-                                    <p class="text-xs text-gray-500">
-                                        Rencana kembali: {{ $p->tgl_kembali_plan->format('d/m/Y') }}.
-                                        Denda dihitung otomatis Rp5.000/hari keterlambatan.
-                                    </p>
-                                </div>
-                                <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-                                    <button type="button"
-                                            onclick="document.getElementById('modalProses{{ $p->id }}').classList.add('hidden')"
-                                            class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                                        Batal
-                                    </button>
-                                    <button type="submit"
-                                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
-                                        Simpan
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
                 @empty
                     <tr>
                         <td colspan="6" class="text-center text-gray-400 py-8">
@@ -158,7 +133,11 @@
                             @endif
                         </td>
                         <td class="px-5 py-3 text-gray-700">{{ $r->petugas?->name ?? '-' }}</td>
-                        <td class="px-5 py-3 text-right">
+                        <td class="px-5 py-3 text-right whitespace-nowrap">
+                            <a href="{{ route('admin.pengembalian.edit', $r->id) }}"
+                                class="inline-block bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition mr-1">
+                                Edit
+                             </a>
                             <form action="{{ route('admin.pengembalian.destroy', $r->id) }}"
                                   method="POST"
                                   onsubmit="return confirm('Batalkan data pengembalian ini?');"
@@ -174,9 +153,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-gray-400 py-8">
-                            Belum ada riwayat pengembalian.
-                        </td>
+                        <td colspan="8" class="text-center text-gray-400 py-8">Belum ada riwayat pengembalian.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -186,4 +163,72 @@
         {{ $riwayat->links() }}
     </div>
 </div>
+<div id="modalPengembalian" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-lg">
+        <form action="{{ route('admin.pengembalian.store') }}" method="POST">
+            @csrf
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h5 class="font-semibold text-gray-800">Proses Pengembalian Baru</h5>
+                <button type="button" onclick="tutupModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Peminjaman</label>
+                    <select id="selectPeminjaman" name="peminjaman_id" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Pilih peminjaman yang sedang dipinjam --</option>
+                        @foreach ($sedangDipinjam as $p)
+                            <option value="{{ $p->id }}">
+                                #{{ $p->id }} - {{ $p->user?->name ?? '-' }} (rencana {{ $p->tgl_kembali_plan->format('d/m/Y') }})
+                            </option>
+                        @endforeach
+                    </select>
+                    @if ($sedangDipinjam->isEmpty())
+                        <p class="text-xs text-gray-400 mt-1">Tidak ada peminjaman berstatus "dipinjam" saat ini.</p>
+                    @endif
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Tanggal Kembali</label>
+                    <input type="date" name="tgl_kembali" value="{{ now()->format('Y-m-d') }}"
+                           max="{{ now()->format('Y-m-d') }}" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Kondisi Alat Saat Dikembalikan</label>
+                    <input type="text" name="kondisi_kembali" placeholder="mis. Baik, tidak ada kerusakan" required maxlength="255"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Denda (Rp)</label>
+                    <input type="number" name="denda" value="0" min="0" step="1000"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center gap-4">
+                <button type="submit"
+                        class="px-5 py-2.5 text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition">
+                    Proses Pengembalian
+                </button>
+                <button type="button" onclick="tutupModal()" class="text-sm font-medium text-gray-600 hover:text-gray-800">
+                    Batal
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function bukaModal(id) {
+        document.getElementById('selectPeminjaman').value = id;
+        document.getElementById('modalPengembalian').classList.remove('hidden');
+    }
+    function tutupModal() {
+        document.getElementById('modalPengembalian').classList.add('hidden');
+    }
+</script>
 @endsection

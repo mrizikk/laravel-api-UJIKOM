@@ -1,28 +1,24 @@
 @extends('layouts.app')
 
 @section('title', 'Edit Pengembalian')
-@section('header-title', 'Edit Data Pengembalian')
+@section('header-title', 'Koreksi Data Pengembalian')
 
 @section('content')
 
-<div class="bg-white rounded-lg shadow p-6 max-w-xl">
-    <h2 class="text-xl font-bold text-gray-800 mb-4">Edit Pengembalian</h2>
-
-    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-        <p class="text-sm text-gray-500 mb-1">Peminjam</p>
-        {{-- Diubah langsung ke $pengembalian->user menggunakan safe operator --}}
-        <p class="font-semibold text-gray-800 mb-3">{{ $pengembalian->user?->name ?? 'N/A' }}</p>
-
-        <p class="text-sm text-gray-500 mb-1">Alat</p>
-        <ul class="list-disc list-inside text-sm text-gray-700">
-            {{-- Diubah langsung ke $pengembalian->detailPinjam --}}
-            @forelse($pengembalian->detailPinjam as $detail)
-                <li>{{ $detail->alat?->nama_alat ?? 'Alat' }} — {{ $detail->jumlah }} pcs</li>
-            @empty
-                <li>Tidak ada detail alat</li>
-            @endforelse
-        </ul>
-    </div>
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <h2 class="text-xl font-bold text-gray-800 mb-1">Peminjaman #{{ $pengembalian->peminjaman_id }}</h2>
+    <p class="text-sm text-gray-500">
+        Peminjam:
+        <span class="font-semibold text-gray-800">{{ $pengembalian->peminjaman?->user?->name ?? 'N/A' }}</span>
+    </p>
+    <p class="text-sm text-gray-500 mb-6">
+        Alat:
+        @forelse($pengembalian->peminjaman?->detailPinjams ?? [] as $detail)
+            {{ $detail->alat?->nama_alat ?? 'Alat' }} ({{ $detail->jumlah }}){{ !$loop->last ? ',' : '' }}
+        @empty
+            -
+        @endforelse
+    </p>
 
     @if($errors->any())
         <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
@@ -39,24 +35,24 @@
         @method('PUT')
 
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Kembali</label>
-            <input type="date" name="tgl_kembali" value="{{ old('tgl_kembali', $pengembalian->tgl_kembali_real ? \Carbon\Carbon::parse($pengembalian->tgl_kembali_real)->format('Y-m-d') : date('Y-m-d')) }}"
-                   class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Denda (Rp)</label>
-            <input type="number" name="denda" value="{{ old('denda', $pengembalian->denda) }}" min="0"
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Kondisi Alat Saat Dikembalikan</label>
+            <input type="text" name="kondisi_kembali" required maxlength="255"
+                   value="{{ old('kondisi_kembali', $pengembalian->kondisi_kembali) }}"
                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
-        <div class="flex gap-3 pt-2">
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
-                Update
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Denda (Rp)</label>
+            <input type="number" name="denda" min="0"
+                   value="{{ old('denda', $pengembalian->denda) }}"
+                   class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="flex items-center gap-4 pt-2">
+            <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
+                Simpan Perubahan
             </button>
-            <a href="{{ route('admin.pengembalian.index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold px-6 py-2 rounded-lg transition">
-                Batal
-            </a>
+            <a href="{{ route('admin.pengembalian.index') }}" class="text-sm font-medium text-gray-600 hover:text-gray-800">Batal</a>
         </div>
     </form>
 </div>

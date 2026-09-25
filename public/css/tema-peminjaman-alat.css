@@ -109,14 +109,28 @@ main table td:first-child {
   color: var(--teks-redup);
 }
 
-/* ---------- Kotak sambutan hijau ---------- */
-main .bg-green-50,
-main .bg-green-100 {
+/* ---------- Kotak sambutan (khusus alert sambutan dashboard, BUKAN badge) ---------- */
+main > .mb-6.bg-emerald-50,
+main > .bg-emerald-50.border.rounded-lg.shadow-sm {
   background: #fdf6e6 !important;
   border: 1px solid rgba(200, 134, 26, .35) !important;
   border-left: 4px solid var(--amber) !important;
   color: #5c4310 !important;
 }
+
+/* ---------- Badge role (Admin / Petugas / Peminjam) — konsisten border amber ---------- */
+.badge-role {
+  display: inline-block;
+  padding: .15rem .6rem;
+  border-radius: 9999px;
+  font-size: .75rem;
+  font-weight: 600;
+  background: #fdf6e6;
+  border: 1px solid rgba(200, 134, 26, .35);
+}
+.badge-role-admin    { color: #000000; } /* ungu */
+.badge-role-petugas  { color: #0a0a02; } /* biru */
+.badge-role-peminjam { color: #000000; } /* amber tua */
 
 /* ---------- Badge status peminjaman (opsional, pasang manual di blade) ---------- */
 .badge-dipinjam   { background: var(--amber);      color: #fff; padding: .15rem .6rem; border-radius: 9999px; font-size: .75rem; }

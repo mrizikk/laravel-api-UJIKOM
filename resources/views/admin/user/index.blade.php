@@ -93,13 +93,13 @@
 
                             <td class="py-3 px-4 border-b">
 
-                                <span class="px-2 py-1 rounded-full text-xs font-semibold
+                                <span class="badge-role
                                     @if($user->role == 'admin')
-                                        bg-purple-100 text-purple-700
+                                        badge-role-admin
                                     @elseif($user->role == 'petugas')
-                                        bg-blue-100 text-blue-700
+                                        badge-role-petugas
                                     @else
-                                        bg-green-100 text-green-700
+                                        badge-role-peminjam
                                     @endif">
 
                                     {{ ucfirst($user->role) }}

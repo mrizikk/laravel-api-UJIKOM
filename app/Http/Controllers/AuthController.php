@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -14,15 +16,21 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $request->validate([
+            'login' => ['required', 'string'],
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
+        $loginInput = $request->input('login');
 
-            $user = Auth::user();
+        // Cari user berdasarkan email ATAU nama (persis, case-insensitive)
+        $user = User::whereRaw('LOWER(email) = ?', [strtolower($loginInput)])
+            ->orWhereRaw('LOWER(name) = ?', [strtolower($loginInput)])
+            ->first();
+
+        if ($user && Hash::check($request->password, $user->password)) {
+            Auth::login($user);
+            $request->session()->regenerate();
 
             if ($user->role === 'admin') {
                 return redirect()->route('admin.dashboard');
@@ -37,8 +45,8 @@ class AuthController extends Controller
         }
 
         return back()->withErrors([
-            'email' => 'Email atau password salah.',
-        ])->onlyInput('email');
+            'login' => 'Email/Nama atau password salah.',
+        ])->onlyInput('login');
     }
 
     public function logout(Request $request)
