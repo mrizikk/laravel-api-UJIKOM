@@ -16,12 +16,13 @@ class PeminjamController extends Controller
         return view('peminjam.katalog', compact('alats'));
     }
 
-    public function ajukanPeminjaman(Request $request)
+        public function ajukanPeminjaman(Request $request)
     {
         $request->validate([
             'tgl_pinjam' => 'required|date|after_or_equal:today',
             'tgl_kembali_plan' => 'required|date|after:tgl_pinjam',
-            'alat_id' => 'required|array',
+            'alat_id' => 'required|array|min:1',
+            'alat_id.*' => 'exists:alat,id',
             'jumlah' => 'required|array',
         ]);
 
@@ -34,19 +35,32 @@ class PeminjamController extends Controller
                 'status' => 'diajukan',
             ]);
 
-            foreach ($request->alat_id as $index => $alatId) {
+            foreach ($request->alat_id as $alatId) {
+                $alat = Alat::lockForUpdate()->findOrFail($alatId);
+                $jumlah = (int) ($request->jumlah[$alatId] ?? 1);
+
+                if ($jumlah < 1) {
+                    throw new \Exception("Jumlah untuk '{$alat->nama_alat}' tidak valid.");
+                }
+
+                if ($alat->stok < $jumlah) {
+                    throw new \Exception("Stok '{$alat->nama_alat}' tidak mencukupi. Sisa stok: {$alat->stok}");
+                }
+
                 DetailPinjam::create([
                     'peminjaman_id' => $peminjaman->id,
                     'alat_id' => $alatId,
-                    'jumlah' => $request->jumlah[$index],
+                    'jumlah' => $jumlah,
                 ]);
+
+                $alat->decrement('stok', $jumlah);
             }
 
             DB::commit();
             return redirect()->route('peminjam.riwayat')->with('success', 'Pengajuan peminjaman berhasil dikirim.');
         } catch (\Exception $e) {
             DB::rollback();
-            return redirect()->back()->with('error', 'Gagal mengajukan peminjaman: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Gagal mengajukan peminjaman: ' . $e->getMessage());
         }
     }
 

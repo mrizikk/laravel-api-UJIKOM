@@ -73,7 +73,8 @@ class PetugasController extends Controller
     public function indexPengembalian(Request $request)
     {
         $peminjamans = Peminjaman::with(['user', 'detailPinjams.alat'])
-            ->where('status', 'dipinjam')
+            ->whereIn('status', ['dipinjam', 'menunggu_konfirmasi'])
+            ->orderByRaw("status = 'menunggu_konfirmasi' DESC")
             ->latest()
             ->get();
 
@@ -96,6 +97,9 @@ class PetugasController extends Controller
         DB::beginTransaction();
         try {
         $peminjaman = Peminjaman::with('detailPinjams')->findOrFail($id);
+            if (!in_array($peminjaman->status, ['dipinjam', 'menunggu_konfirmasi'])) {
+                throw new \Exception('Peminjaman ini belum bisa diproses pengembaliannya.');
+            }
 
         if (Pengembalian::where('peminjaman_id', $peminjaman->id)->exists()) {
             throw new \Exception('Peminjaman ini sudah pernah dikembalikan.');
